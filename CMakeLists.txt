@@ -16,6 +16,13 @@ set(SOURCE_LIB_PARCER lib/parser/parcer.cpp lib/parser/fastnetmon_packet_parser.
 add_library(parcer STATIC ${SOURCE_LIB_PARCER})
 target_link_libraries(synfloodprotect parcer)
 
+include_directories("/usr/src/linux-4.3.3/")
+#include_directories("/usr/src/linux-4.3.3/include/uapi/")
+#include_directories("/usr/src/linux-4.3.3/include")
+
+set(SOURCE_LIB_SYNC  lib/syncookie/synproxy.cpp lib/syncookie/synproxy.h lib/syncookie/syncookies.c)
+add_library(syncookie STATIC ${SOURCE_LIB_SYNC})
+target_link_libraries(synfloodprotect syncookie)
 
 include_directories(".")
 
@@ -40,6 +47,8 @@ if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
     target_link_libraries(synfloodprotect ${Boost_LIBRARIES})
 endif()
+
+
 
 # Specify config for deb package
 # http://www.cmake.org/Wiki/CMake:CPackPackageGenerators#DEB_.28UNIX_only.29

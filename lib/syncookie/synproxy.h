@@ -1,0 +1,8 @@
+//
+// Created by root on 29.03.16.
+//
+
+#ifndef SYNFLOODPROTECT_SYNPROXY_H_H
+#define SYNFLOODPROTECT_SYNPROXY_H_H
+
+#endif //SYNFLOODPROTECT_SYNPROXY_H_H

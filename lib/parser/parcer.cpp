@@ -39,7 +39,8 @@
 #define TCP_URG_FLAG_SHIFT 6
 
 // http://stackoverflow.com/questions/14528233/bit-masking-in-c-how-to-get-first-bit-of-a-byte
-int extract_bit_value(uint8_t num, int bit) {
+int extract_bit_value(uint8_t num, int bit)
+{
     if (bit > 0 && bit <= 8) {
         return ((num >> (bit - 1)) & 1);
     } else {
@@ -47,7 +48,8 @@ int extract_bit_value(uint8_t num, int bit) {
     }
 }
 
-std::string get_printable_protocol_name(unsigned int protocol) {
+std::string get_printable_protocol_name(unsigned int protocol)
+{
     std::string proto_name;
 
     switch (protocol) {
@@ -68,7 +70,8 @@ std::string get_printable_protocol_name(unsigned int protocol) {
     return proto_name;
 }
 
-std::string print_tcp_flags(uint8_t flag_value) {
+std::string print_tcp_flags(uint8_t flag_value)
+{
     if (flag_value == 0) {
         return "-";
     }
@@ -129,15 +132,35 @@ std::string print_tcp_flags(uint8_t flag_value) {
     return flags_as_string.str();
 }
 
-std::string convert_ip_as_uint_to_string(uint32_t ip_as_integer) {
+std::string convert_ip_as_uint_to_string(uint32_t ip_as_integer)
+{
     struct in_addr ip_addr;
     ip_addr.s_addr = ip_as_integer;
     return (std::string)inet_ntoa(ip_addr);
 }
 
-bool parse_raw_packet_to_simple_packet(u_char* buffer, int len, simple_packet& packet) {
-    struct pfring_pkthdr packet_header;
+bool parse_raw_packet_to_packet_header(u_char *buffer, int len, pfring_pkthdr &packet_header)
+{
+    packet_header.len = (u_int32_t) len;
+    packet_header.caplen = (u_int32_t) len;
 
+    // We do not calculate timestamps because timestamping is very CPU intensive operation:
+    // https://github.com/ntop/PF_RING/issues/9
+    u_int8_t timestamp = 0;
+    u_int8_t add_hash = 0;
+    fastnetmon_parse_pkt((u_char*)buffer, &packet_header, 4, timestamp, add_hash);
+
+    if (packet_header.extended_hdr.parsed_pkt.ip_version != 4
+        && packet_header.extended_hdr.parsed_pkt.ip_version != 6)
+        return false;
+
+    return true;
+}
+
+
+bool parse_raw_packet_to_simple_packet(u_char* buffer, int len, simple_packet& packet)
+{
+    struct pfring_pkthdr packet_header;
     memset(&packet_header, 0, sizeof(packet_header));
     packet_header.len = len;
     packet_header.caplen = len;
@@ -147,10 +170,6 @@ bool parse_raw_packet_to_simple_packet(u_char* buffer, int len, simple_packet& p
     u_int8_t timestamp = 0;
     u_int8_t add_hash = 0;
     fastnetmon_parse_pkt((u_char*)buffer, &packet_header, 4, timestamp, add_hash);
-
-    // char print_buffer[512];
-    // fastnetmon_print_parsed_pkt(print_buffer, 512, (u_char*)buffer, &packet_header);
-    // logger.info("%s", print_buffer);
 
     if (packet_header.extended_hdr.parsed_pkt.ip_version != 4 && packet_header.extended_hdr.parsed_pkt.ip_version != 6) {
         return false;

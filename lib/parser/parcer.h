@@ -60,5 +60,6 @@ std::string get_printable_protocol_name(unsigned int protocol);
 std::string print_tcp_flags(uint8_t flag_value);
 std::string convert_ip_as_uint_to_string(uint32_t ip_as_integer);
 bool parse_raw_packet_to_simple_packet(u_char* buffer, int len, simple_packet& packet);
+bool parse_raw_packet_to_packet_header(u_char *buffer, int len, pfring_pkthdr &packet_header);
 
 #endif //SYNFLOODPROTECT_PARCER_H
