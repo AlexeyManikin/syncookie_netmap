@@ -20,8 +20,9 @@ include_directories("/usr/src/linux-4.3.3/")
 #include_directories("/usr/src/linux-4.3.3/include/uapi/")
 #include_directories("/usr/src/linux-4.3.3/include")
 
-set(SOURCE_LIB_SYNC  lib/syncookie/synproxy.cpp lib/syncookie/synproxy.h lib/syncookie/syncookies.c)
+set(SOURCE_LIB_SYNC  lib/syncookie/synproxy.cpp lib/syncookie/synproxy.h)
 add_library(syncookie STATIC ${SOURCE_LIB_SYNC})
+target_link_libraries(syncookie parcer)
 target_link_libraries(synfloodprotect syncookie)
 
 include_directories(".")
@@ -47,8 +48,6 @@ if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
     target_link_libraries(synfloodprotect ${Boost_LIBRARIES})
 endif()
-
-
 
 # Specify config for deb package
 # http://www.cmake.org/Wiki/CMake:CPackPackageGenerators#DEB_.28UNIX_only.29

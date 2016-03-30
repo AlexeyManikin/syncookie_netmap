@@ -56,6 +56,7 @@ public:
 };
 
 int extract_bit_value(uint8_t num, int bit);
+int check_bit_value(uint8_t num, int bit);
 std::string get_printable_protocol_name(unsigned int protocol);
 std::string print_tcp_flags(uint8_t flag_value);
 std::string convert_ip_as_uint_to_string(uint32_t ip_as_integer);

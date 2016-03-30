@@ -48,6 +48,16 @@ int extract_bit_value(uint8_t num, int bit)
     }
 }
 
+// http://stackoverflow.com/questions/14528233/bit-masking-in-c-how-to-get-first-bit-of-a-byte
+int check_bit_value(uint8_t num, int bit)
+{
+    if (bit > 0 && bit <= 8) {
+        return ((num >> (bit - 1)) & num);
+    } else {
+        return 0;
+    }
+}
+
 std::string get_printable_protocol_name(unsigned int protocol)
 {
     std::string proto_name;
