@@ -28,6 +28,7 @@
 #include <boost/algorithm/string.hpp>
 #include <lib/parser/packet_parser.h>
 #include <netinet/ip.h>
+#include "lib/parser/parcer_helper.h"
 
 #define NETMAP_WITH_LIBS
 #include "net/netmap_user.h"
@@ -423,7 +424,7 @@ uint32_t generate_syncookie_seq(uint16_t mss, unsigned char wscale, uint8_t sper
 
 struct cookie_param {
     uint16_t mss;
-    unsigned char wscale = 0;
+    unsigned char wscale;
     uint8_t sperm;
 };
 

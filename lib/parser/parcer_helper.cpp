@@ -112,7 +112,7 @@ int check_bit_value(uint8_t num, int bit)
 }
 
 char* etheraddr2string(const u_char* ep, char* buf) {
-    char* hex = "0123456789ABCDEF";
+    char* hex = (char* ) "0123456789ABCDEF";
     u_int i, j;
     char* cp;
 
@@ -176,13 +176,13 @@ char* proto2str(u_short proto) {
 
     switch (proto) {
         case IPPROTO_TCP:
-            return ("TCP");
+            return ((char*) "TCP");
         case IPPROTO_UDP:
-            return ("UDP");
+            return ((char*) "UDP");
         case IPPROTO_ICMP:
-            return ("ICMP");
+            return ((char*) "ICMP");
         case IPPROTO_GRE:
-            return ("GRE");
+            return ((char*) "GRE");
         default:
             snprintf(protoName, sizeof(protoName), "%d", proto);
             return (protoName);

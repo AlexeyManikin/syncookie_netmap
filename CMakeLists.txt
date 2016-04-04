@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 2.8)
-project(synfloodproted)
+project(synfloodprotect)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 set(SOURCE_FILES main.cpp)
-add_executable(synfloodproted ${SOURCE_FILES})
-include_directories("/usr/src/linux-4.3.3/")
+add_executable(synfloodprotect ${SOURCE_FILES})
+#include_directories("/usr/src/linux-4.3.3/")
+#include_directories("/usr/src/linux-4.3.3/include")
 include_directories(".")
 
 
@@ -15,7 +16,7 @@ target_link_libraries(synfloodprotect logger)
 
 set(SOURCE_LIB_PARCER lib/parser/parcer.cpp
         lib/parser/parcer.h
-        lib/parser/packet_parser.c
+        lib/parser/packet_parser.cpp
         lib/parser/packet_parser.h
         lib/parser/parcer_helper.cpp
         lib/parser/parcer_helper.h
@@ -23,9 +24,9 @@ set(SOURCE_LIB_PARCER lib/parser/parcer.cpp
 add_library(parcer STATIC ${SOURCE_LIB_PARCER})
 target_link_libraries(synfloodprotect parcer)
 
-set(SOURCE_LIB_SYNC  lib/syncookie/synproxy.cpp lib/syncookie/synproxy.h lib/syncookie/cryptohash.h lib/syncookie/sha1.c lib/syncookie/be_byteshift.h)
-add_library(syncookie STATIC ${SOURCE_LIB_SYNC})
-target_link_libraries(synfloodprotect syncookie)
+#set(SOURCE_LIB_SYNC  lib/syncookie/synproxy.cpp lib/syncookie/synproxy.h lib/syncookie/cryptohash.h lib/syncookie/sha1.c lib/syncookie/be_byteshift.h)
+#add_library(syncookie STATIC ${SOURCE_LIB_SYNC})
+#target_link_libraries(synfloodprotect syncookie)
 
 set(LOG4CPP_CUSTOM_INSTALL_PATH "/opt/log4cpp1.1.1")
 

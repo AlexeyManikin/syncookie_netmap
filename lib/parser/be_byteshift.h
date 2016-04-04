@@ -73,34 +73,38 @@ static inline void put_unaligned_be64(__u64 val, void *p)
 
 static inline __u16 get_unaligned_le16(const void *p)
 {
-    const __u8 *_p = p;
+    const __u8 *_p = (__u8 *) p;
     return _p[0] | _p[1] << 8;
 }
 
 static inline void put_unaligned_le16(__u16 val, void *p)
 {
-    __u8 *_p = p;
+    __u8 *_p = (__u8 *) p;
     _p[0] = val;
     _p[1] = val >> 8;
 }
 
 static inline uint32_t get_unaligned32(const void *p)
 {
-    return (uint32_t) p;
+    uint32_t* int_p = (uint32_t*) p;
+    return *int_p;
+    //return (uint32_t) p;
 }
 
 static inline uint64_t get_unaligned64(const void *p)
 {
-    return (uint64_t) p;
+    uint64_t* int_p = (uint64_t*) p;
+    return *int_p;
+    //return (uint64_t) p;
 }
 
 static inline __u32 get_unaligned_le32(const void *_ptr)
 {
-    const __u8 *ptr = _ptr;
+    const __u8 *ptr = (__u8 *) _ptr;
     return ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24);
 }
 
 #define get_unaligned_be32(p)     get_unaligned32(p)
-#define get_unaligned_be64(p)     get_unaligned64(p)
+//#define get_unaligned_be64(p)     get_unaligned64(p)
 
 #endif //SYNFLOODPROTECT_BE_BYTESHIFT_H

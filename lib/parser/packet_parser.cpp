@@ -11,9 +11,126 @@
 #include <string.h> // memcpy
 #include <stdio.h>
 #include <arpa/inet.h> // inet_ntop
-#include "be_byteshift.h"
-#include "parcer_helper.h"
 
+#include "be_byteshift.h"
+//#include "parcer_helper.h"
+
+// TCP flags
+#define TH_FIN_MULTIPLIER   0x01
+#define TH_SYN_MULTIPLIER   0x02
+#define TH_RST_MULTIPLIER   0x04
+#define TH_PUSH_MULTIPLIER  0x08
+#define TH_ACK_MULTIPLIER   0x10
+#define TH_URG_MULTIPLIER   0x20
+
+#define __LITTLE_ENDIAN_BITFIELD /* FIX */
+
+struct tcphdr {
+    u_int16_t source;
+    u_int16_t dest;
+    u_int32_t seq;
+    u_int32_t ack_seq;
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+    u_int16_t res1 : 4, doff : 4, fin : 1, syn : 1, rst : 1, psh : 1, ack : 1, urg : 1, ece : 1, cwr : 1;
+#elif defined(__BIG_ENDIAN_BITFIELD)
+    u_int16_t doff : 4, res1 : 4, cwr : 1, ece : 1, urg : 1, ack : 1, psh : 1, rst : 1, syn : 1, fin : 1;
+#else
+    //#error "Adjust your <asm/byteorder.h> defines"
+#endif
+    u_int16_t window;
+    u_int16_t check;
+    u_int16_t urg_ptr;
+};
+
+struct udphdr {
+    u_int16_t source;
+    u_int16_t dest;
+    u_int16_t len;
+    u_int16_t check;
+};
+
+
+struct opttimes {
+    u_int32_t timestamp_send;
+    u_int32_t timestamp_reserved;
+};
+
+struct optmss {
+    uint16_t mss;
+};
+
+
+#define __LITTLE_ENDIAN_BITFIELD /* FIX */
+struct iphdr {
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+    u_int8_t ihl : 4, version : 4;
+#elif defined(__BIG_ENDIAN_BITFIELD)
+    u_int8_t version : 4, ihl : 4;
+#else
+#error "Please fix <asm/byteorder.h>"
+#endif
+    u_int8_t tos;
+    u_int16_t tot_len;
+    u_int16_t id;
+#define IP_CE 0x8000
+#define IP_DF 0x4000
+#define IP_MF 0x2000
+#define IP_OFFSET 0x1FFF
+    u_int16_t frag_off;
+    u_int8_t ttl;
+    u_int8_t protocol;
+    u_int16_t check;
+    u_int32_t saddr;
+    u_int32_t daddr;
+    /*The options start here. */
+};
+
+#define TCPOPT_NOP              1       /* Padding */
+#define TCPOPT_EOL              0       /* End of options */
+#define TCPOPT_MSS              2       /* Segment size negotiating */
+#define TCPOPT_WINDOW           3       /* Window scaling */
+#define TCPOPT_SACK_PERM        4       /* SACK Permitted */
+#define TCPOPT_SACK             5       /* SACK Block */
+#define TCPOPT_TIMESTAMP        8       /* Better RTT estimations/PAWS */
+#define TCPOPT_MD5SIG           19      /* MD5 Signature (RFC2385) */
+#define TCPOPT_FASTOPEN         34      /* Fast open (RFC7413) */
+#define TCPOPT_EXP              254     /* Experimental */
+
+#define TCPOLEN_MSS            4
+#define TCPOLEN_WINDOW         3
+#define TCPOLEN_SACK_PERM      2
+#define TCPOLEN_TIMESTAMP      10
+#define TCPOLEN_MD5SIG         18
+#define TCPOLEN_FASTOPEN_BASE  2
+#define TCPOLEN_EXP_FASTOPEN_BASE  4
+
+/* But this is what stacks really send out. */
+#define TCPOLEN_TSTAMP_ALIGNED          12
+#define TCPOLEN_WSCALE_ALIGNED          4
+#define TCPOLEN_SACKPERM_ALIGNED        4
+#define TCPOLEN_SACK_BASE               2
+#define TCPOLEN_SACK_BASE_ALIGNED       4
+#define TCPOLEN_SACK_PERBLOCK           8
+#define TCPOLEN_MD5SIG_ALIGNED          20
+#define TCPOLEN_MSS_ALIGNED             4
+
+#define TCP_SACK_SEEN     (1 << 0)   /*1 = peer is SACK capable, */
+
+
+#define NO_TUNNEL_ID 0xFFFFFFFF
+
+#define NEXTHDR_HOP 0
+#define NEXTHDR_TCP 6
+#define NEXTHDR_UDP 17
+#define NEXTHDR_IPV6 41
+#define NEXTHDR_ROUTING 43
+#define NEXTHDR_FRAGMENT 44
+#define NEXTHDR_ESP 50
+#define NEXTHDR_AUTH 51
+#define NEXTHDR_ICMP 58
+#define NEXTHDR_NONE 59
+#define NEXTHDR_DEST 60
+#define NEXTHDR_MOBILITY 135
 void parce_tcp_options(char* tcp_begin, struct tcp_options *options)
 {
     options->nop = 0;

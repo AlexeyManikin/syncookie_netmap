@@ -30,7 +30,7 @@
 
 #include "parcer.h"
 #include "packet_parser.h"
-#include "parcer_helper.h"
+//#include "parcer_helper.h"
 
 bool parse_raw_packet_to_packet_header(u_char *buffer, int len, pfring_pkthdr &packet_header)
 {
