@@ -1,1 +1,0 @@
-cmd_/home/alexey/project/synfloodprotect/kernel/show_net_urandom.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/alexey/project/synfloodprotect/kernel/show_net_urandom.ko /home/alexey/project/synfloodprotect/kernel/show_net_urandom.o /home/alexey/project/synfloodprotect/kernel/show_net_urandom.mod.o
