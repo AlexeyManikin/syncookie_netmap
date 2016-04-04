@@ -64,7 +64,7 @@
 #include <pcap/pcap.h>
 #endif
 
-#include "ctrs.h"
+#include "example/ctrs.h"
 
 #ifdef _WIN32
 #define cpuset_t        DWORD_PTR   //uint64_t

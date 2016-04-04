@@ -1,31 +1,31 @@
 cmake_minimum_required(VERSION 2.8)
-project(synfloodprotect)
+project(synfloodproted)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 set(SOURCE_FILES main.cpp)
-add_executable(synfloodprotect ${SOURCE_FILES})
+add_executable(synfloodproted ${SOURCE_FILES})
+include_directories("/usr/src/linux-4.3.3/")
+include_directories(".")
 
-add_executable(bridge bridge.cpp)
 
 set(SOURCE_LIB_LOGGER lib/logger/logger.cpp)
 add_library(logger STATIC ${SOURCE_LIB_LOGGER})
 target_link_libraries(synfloodprotect logger)
 
-set(SOURCE_LIB_PARCER lib/parser/parcer.cpp lib/parser/fastnetmon_packet_parser.c lib/parser/parcer.h lib/parser/fastnetmon_packet_parser.h)
+set(SOURCE_LIB_PARCER lib/parser/parcer.cpp
+        lib/parser/parcer.h
+        lib/parser/packet_parser.c
+        lib/parser/packet_parser.h
+        lib/parser/parcer_helper.cpp
+        lib/parser/parcer_helper.h
+        lib/parser/be_byteshift.h)
 add_library(parcer STATIC ${SOURCE_LIB_PARCER})
 target_link_libraries(synfloodprotect parcer)
 
-include_directories("/usr/src/linux-4.3.3/")
-#include_directories("/usr/src/linux-4.3.3/include/uapi/")
-#include_directories("/usr/src/linux-4.3.3/include")
-
-set(SOURCE_LIB_SYNC  lib/syncookie/synproxy.cpp lib/syncookie/synproxy.h)
+set(SOURCE_LIB_SYNC  lib/syncookie/synproxy.cpp lib/syncookie/synproxy.h lib/syncookie/cryptohash.h lib/syncookie/sha1.c lib/syncookie/be_byteshift.h)
 add_library(syncookie STATIC ${SOURCE_LIB_SYNC})
-target_link_libraries(syncookie parcer)
 target_link_libraries(synfloodprotect syncookie)
-
-include_directories(".")
 
 set(LOG4CPP_CUSTOM_INSTALL_PATH "/opt/log4cpp1.1.1")
 
