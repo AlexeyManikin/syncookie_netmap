@@ -152,6 +152,11 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
     register unsigned int tx_avail, tx_cur;
     char *tx_buf;
 
+    int poll_result = poll(&fd_out, 4, 200);
+    if (poll_result == 0)
+        continue;
+
+
     tx_cur   = tx_ring->cur;
     tx_avail = nm_ring_space(tx_ring);
 
