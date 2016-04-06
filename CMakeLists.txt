@@ -34,7 +34,6 @@ add_executable(synfloodprotect ${HEADER_FILES} ${SOURCE_LIB_SYNC} ${SOURCE_FILES
 
 include_directories(".")
 
-
 set(LOG4CPP_CUSTOM_INSTALL_PATH "/opt/log4cpp1.1.1")
 
 # Try to find log4cpp includes path

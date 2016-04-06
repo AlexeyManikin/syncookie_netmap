@@ -422,6 +422,7 @@ void create_main_work_pool(std::string interface_for_listening)
     signal(SIGTERM, sigint_h);
 
     packet_nic_rx_thread_group.add_thread(new boost::thread(update_time_value));
+    boost::thread::yield();
 
     for (uint16_t i = 0; i < netmap_descriptor->req.nr_rx_rings; i++) {
 
