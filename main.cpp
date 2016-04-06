@@ -50,6 +50,7 @@ extern log4cpp::Category& logger;
 static int do_not_abort = 1;
 
 
+
 static void sigint_h(int sig)
 {
     (void)sig;    /* UNUSED */
@@ -145,144 +146,8 @@ uint32_t synproxy_init_timestamp_cookie(unsigned char wscale, uint8_t sperm, uin
     return tsval;
 }
 
-//
-//uint32_t generate_syncookie_seq(uint16_t mss, unsigned char wscale, uint8_t sperm, u_int32_t ip,
-//                                uint32_t timestamp)
-//{
-//    uint32_t return_val = 0;
-//    unsigned char *pointer = (unsigned char *) &return_val;
-//    unsigned char *ip_pointer = (unsigned char *) &ip;
-//    struct sunt16* s16 = (struct sunt16*) &return_val;
-//    s16->val = mss;
-//    s16->val2 = wscale;
-//
-//    if (sperm) {
-//        s16->val2 |= 1<<8;
-//    } else {
-//        s16->val2 &= ~(1<<8);
-//    }
-//
-//    ip = ip<<25;
-//    return_val |= ip;
-//
-//    return_val ^= timestamp;
-//    return return_val;
-//}
-
-//struct cookie_param {
-//    uint16_t mss;
-//    unsigned char wscale;
-//    uint8_t sperm;
-//};
-//
-//bool check_syncookie(uint32_t ack_seq, u_int32_t ip, uint32_t timestamp)
-//{
-//    ack_seq = ack_seq - 1;
-//    ack_seq ^= timestamp;
-//    u_int32_t ip_mask = 127;
-//
-//    if (ack_seq & ip_mask != ip & ip_mask) {
-//        return false;
-//    }
-//
-//    return true;
-//}
-
-//void get_syncookie_seq(uint32_t ack_seq, u_int32_t ip, uint32_t timestamp, cookie_param* param)
-//{
-//    ack_seq = ack_seq - 1;
-//
-//    ack_seq ^= timestamp;
-//    u_int32_t ip_mask = 127;
-//
-//    if (ack_seq & ip_mask != ip & ip_mask) {
-//        return;
-//    }
-//
-//    uint16_t mss;
-//    unsigned char wscale = 0;
-//    uint8_t sperm;
-//
-//    struct sunt16* s16 = (struct sunt16*) &ack_seq;
-//    if ( s16->val2 & (0X0000 | 1<<8)) {
-//        sperm = 1;
-//    } else {
-//        sperm = 0;
-//    }
-//
-//    u_int16_t mask = s16->val2 & 0X00FF;
-//    wscale = (char) s16->val2 & 0X00FF;
-//
-//    param->mss = mss;
-//    param->wscale = wscale;
-//    param->sperm = sperm;
-//}
-
-//void send_syn_to_host_response(struct netmap_ring *rx_ring, struct pfring_pkthdr *packet_header)
-//{
-//    register unsigned int rx_cur;
-//    char *rx_buf;
-//
-//    rx_cur   = rx_ring->cur;
-//
-//    unsigned char* pointer;
-//    unsigned int size = sizeof(ether_header) + 20 + sizeof(tcphdr)  + 24; /* tcp options */
-//
-//    pointer = (unsigned char *) std::malloc(size);
-//    std::memset(pointer, 0, size);
-//
-//    initialize_ehhdr(packet_header->extended_hdr.parsed_pkt.smac,
-//                     packet_header->extended_hdr.parsed_pkt.dmac,
-//                     (struct ether_header *) pointer);
-//
-//    iphdr* ip;
-//    ip = (struct iphdr*) &pointer[sizeof(struct ethhdr)];
-//
-//    initialize_iphdr(packet_header->extended_hdr.parsed_pkt.ip_src.v4,
-//                     packet_header->extended_hdr.parsed_pkt.ip_dst.v4,
-//                     size, ip, IPPROTO_TCP);
-//
-////
-////
-////    cookie_param params;
-////    get_syncookie_seq(packet_header->extended_hdr.parsed_pkt.tcp.ack_num,
-////                      packet_header->extended_hdr.parsed_pkt.ip_src.v4,
-////                      packet_header->extended_hdr.parsed_pkt.tcp.options.timestamp_reserved,
-////                      &params);
-//
-//
-//    tcphdr* tcp;
-//    tcp = (struct tcphdr*) &pointer[sizeof(struct ethhdr) + 20];
-//
-//    initialize_tcphdr(tcp, packet_header->extended_hdr.parsed_pkt.l4_src_port,
-//                      packet_header->extended_hdr.parsed_pkt.l4_dst_port,
-//                      -1,
-//                      packet_header->extended_hdr.parsed_pkt.tcp.seq_num);
-//
-////    generate_tcp_options((char *)(pointer + sizeof(struct ethhdr) + 20 + sizeof(struct tcphdr)),
-////                         params.mss, packet_header->extended_hdr.parsed_pkt.tcp.options.timestamp_send,
-////                         0, params.wscale, params.sperm);
-//
-//    tcp->syn = 1;
-//
-//    tcp->check = get_tcp_checksum(ip, tcp);
-//
-//    rx_buf = NETMAP_BUF(rx_ring, rx_ring->slot[rx_cur].buf_idx);
-//    bzero(rx_buf, size);
-//    nm_pkt_copy(pointer, rx_buf, size);
-//
-//    logger.debug("\nACK - proxy syn");
-//    logging_packet_info(get_pached_info((u_char *)rx_buf, size));
-//
-//    rx_ring->slot[rx_cur].len = (uint16_t) size;
-//    rx_ring->slot[rx_cur].flags |= NS_BUF_CHANGED;
-//    rx_ring->slot[rx_cur].flags |= NS_FORWARD;
-//    rx_ring->flags |= NR_FORWARD;
-//
-//    free(pointer);
-//}
-
-bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring, struct pfring_pkthdr *packet_header)
+bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring, struct pfring_pkthdr *packet_header,
+                             struct pollfd* fd_out)
 {
     register unsigned int tx_avail, tx_cur;
     char *tx_buf;
@@ -292,10 +157,10 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
 
 
     // DEBUG /////////////////////////////////////////////////////////////
-    char *print;
-    print = (char *) std::malloc(999);
-    print_parsed_pkt(print, 999, packet_header);
-    logger.debug("%s", print);
+//    char *print;
+//    print = (char *) std::malloc(999);
+//    print_parsed_pkt(print, 999, packet_header);
+//    logger.debug("%s", print);
     // DEBUG /////////////////////////////////////////////////////////////
 
     if (tx_avail > 0) {
@@ -351,11 +216,13 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
         tx_ring->slot[tx_cur].flags |= NS_BUF_CHANGED;
         tx_ring->head = tx_ring->cur = nm_ring_next(tx_ring, tx_cur);
 
+        ioctl(fd_out->fd, NIOCTXSYNC, NULL);
         std::free(pointer);
 
         return true;
     } else {
-        logger.warn("tx not availible");
+        ioctl(fd_out->fd, NIOCTXSYNC, NULL);
+        //logger.warn("tx not availible");
     }
     return false;
 }
@@ -413,13 +280,13 @@ bool send_echo_response(char *rx_buf, int len, struct netmap_ring *tx_ring, stru
 
         free(pointer);
     } else {
-        logger.warn("tx not availible");
+        //logger.warn("tx not availible");
     }
 }
 
 static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int thread_id)
 {
-    struct pollfd fds;
+    struct pollfd fd_in, fd_out;
     struct netmap_ring *rx_ring = NULL;
     struct netmap_ring *tx_ring = NULL;
     register unsigned int rx_cur, tx_cur, rx_len;
@@ -428,12 +295,15 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
 
     struct netmap_if* nifp = netmap_description->nifp;
 
-    fds.fd     = netmap_description->fd;
-    fds.events = POLLIN;
+    fd_in.fd     = netmap_description->fd;
+    fd_in.events = POLLIN;
+
+    fd_out.fd     = netmap_description->fd;
+    fd_out.events = POLLOUT;
 
     while (do_not_abort) {
 
-        int poll_result = poll(&fds, 1, 1000);
+        int poll_result = poll(&fd_in, 1, 1000);
         if (poll_result == 0)
             continue;
 
@@ -458,6 +328,7 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
                     forward_packet(rx_ring, rx_cur);
                 } else {
                     tx_ring = NETMAP_TXRING(nifp, i);
+                    tx_ring->num_slots;
 
                     if (packet_header.extended_hdr.parsed_pkt.l3_proto == IPPROTO_ICMP
                         || packet_header.extended_hdr.parsed_pkt.l4_dst_port == 7) {
@@ -471,13 +342,13 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
                         flags = packet_header.extended_hdr.parsed_pkt.tcp.flags;
 
                         if (flags == 2 /*TCP_SYN_FLAG*/) {
-                            logger.warn("syn");
-                            if (packet_header.extended_hdr.parsed_pkt.tcp.options.mss != 0) {
-                                logger.warn("mss != 0 ");
-                                send_syncookie_response(rx_buf, rx_len, tx_ring, &packet_header);
-                            } else {
+                            //logger.warn("syn");
+                            //if (packet_header.extended_hdr.parsed_pkt.tcp.options.mss != 0) {
+                                //logger.warn("mss != 0 ");
+                                send_syncookie_response(rx_buf, rx_len, tx_ring, &packet_header, &fd_out);
+                            //} else {
                                 // DROP PACKET
-                            }
+                            //}
 //                        } else if (flags == 16 /*TCP_ACK_FLAG*/) {
 //                            if (check_syncookie(packet_header.extended_hdr.parsed_pkt.tcp.ack_num,
 //                                                packet_header.extended_hdr.parsed_pkt.l4_src_port,

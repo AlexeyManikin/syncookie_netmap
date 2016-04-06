@@ -60,23 +60,12 @@ static __u32 cookie_hash(__be32 saddr, __be32 daddr, __be16 sport, __be16 dport,
     return return_value;
 }
 
-/*
- * TODO: HZ надо получать динамически
- */
-#define HZ 120686
-#define MAX_SYNCOOKIE_AGE	2
-#define TCP_SYNCOOKIE_PERIOD	(60 * HZ)
-#define TCP_SYNCOOKIE_VALID	(MAX_SYNCOOKIE_AGE * TCP_SYNCOOKIE_PERIOD)
 
-#include <stdio.h>
 
 extern log4cpp::Category& logger;
 
 /*static inline */__u32 tcp_cookie_time(void)
 {
-//    __u64 val = 0; /*get_jiffies_64();*/
-//    do_div(val, TCP_SYNCOOKIE_PERIOD);
-//    return val;
     FILE *file;
     file = fopen("/proc/beget_uptime", "r");
     __u32 tcp_cookie_time = 0;
@@ -105,20 +94,13 @@ extern log4cpp::Category& logger;
  */
 __u32  tcp_time_stamp()
 {
-//    /* get monotonic clock time */
-//    struct timespec monotime;
-//    clock_gettime(CLOCK_MONOTONIC, &monotime);
-//    return (__u32) monotime.tv_sec * 1000 + (__u32) monotime.tv_nsec;
-
     FILE *file;
     file = fopen("/proc/beget_uptime", "r");
     __u32 tcp_cookie_time = 0;
     __u64 jiffies = 0;
     if (fscanf (file, "%llu %lu", &jiffies, (long *)&tcp_cookie_time)) {
         fclose(file);
-        logger.warn("jiffies %lu, tcp_cookie_time %lu, jiffies %u", jiffies, tcp_cookie_time);
         __u32 tmp = (__u32) jiffies & 0X00000000ffffffff;
-        logger.warn("jiffies %u", tmp);
         return tmp;
     } else {
         logger.warn("Noooo");
