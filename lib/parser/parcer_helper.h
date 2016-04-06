@@ -45,7 +45,7 @@ std::string print_tcp_flags(uint8_t flag_value);
 std::string convert_ip_as_uint_to_string(uint32_t ip_as_integer);
 int extract_bit_value(uint8_t num, int bit);
 int check_bit_value(uint8_t num, int bit);
-int fastnetmon_print_parsed_pkt(char* buff, u_int buff_len, const struct pfring_pkthdr* h);
+int print_parsed_pkt(char *buff, u_int buff_len, const struct pfring_pkthdr *h);
 char* etheraddr2string(const u_char* ep, char* buf);
 
 #endif //SYNFLOODPROTECT_PARCER_HELPER_H

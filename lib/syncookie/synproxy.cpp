@@ -18,6 +18,8 @@
 
 #include "cryptohash.h"
 #include "div64.h"
+#include "sha1.c"
+#include "../logger/logger.h"
 
 #define __read_mostly __attribute__((__section__(".data..read_mostly")))
 static __u32 syncookie_secret[2][16-4+SHA_DIGEST_WORDS] __read_mostly;
@@ -66,11 +68,26 @@ static __u32 cookie_hash(__be32 saddr, __be32 daddr, __be16 sport, __be16 dport,
 #define TCP_SYNCOOKIE_PERIOD	(60 * HZ)
 #define TCP_SYNCOOKIE_VALID	(MAX_SYNCOOKIE_AGE * TCP_SYNCOOKIE_PERIOD)
 
-static inline __u32 tcp_cookie_time(void)
+#include <stdio.h>
+
+extern log4cpp::Category& logger;
+
+/*static inline */__u32 tcp_cookie_time(void)
 {
-    __u64 val = 0; /*get_jiffies_64();*/
-    do_div(val, TCP_SYNCOOKIE_PERIOD);
-    return val;
+//    __u64 val = 0; /*get_jiffies_64();*/
+//    do_div(val, TCP_SYNCOOKIE_PERIOD);
+//    return val;
+    FILE *file;
+    file = fopen("/proc/beget_uptime", "r");
+    __u32 tcp_cookie_time = 0;
+    __u64 jiffies = 0;
+    if (fscanf (file, "%llu %lu", &jiffies, (long *)&tcp_cookie_time)) {
+        fclose(file);
+        return tcp_cookie_time;
+    } else {
+        fclose(file);
+        return 0;
+    }
 }
 
 /**
@@ -88,44 +105,26 @@ static inline __u32 tcp_cookie_time(void)
  */
 __u32  tcp_time_stamp()
 {
-    /* get monotonic clock time */
-    struct timespec monotime;
-    clock_gettime(CLOCK_MONOTONIC, &monotime);
-    return (__u32) monotime.tv_sec * 1000 + (__u32) monotime.tv_nsec;
-}
+//    /* get monotonic clock time */
+//    struct timespec monotime;
+//    clock_gettime(CLOCK_MONOTONIC, &monotime);
+//    return (__u32) monotime.tv_sec * 1000 + (__u32) monotime.tv_nsec;
 
-/*
- * when syncookies are in effect and tcp timestamps are enabled we encode
- * tcp options in the lower bits of the timestamp value that will be
- * sent in the syn-ack.
- * Since subsequent timestamps use the normal tcp_time_stamp value, we
- * must make sure that the resulting initial timestamp is <= tcp_time_stamp.
- */
-__u32 cookie_init_timestamp(struct request_sock *req)
-{
-    struct inet_request_sock *ireq;
-    __u32 ts, ts_now = tcp_time_stamp();
-    __u32 options = 0;
-
-    ireq = inet_rsk(req);
-
-    options = ireq->wscale_ok ? ireq->snd_wscale : TS_OPT_WSCALE_MASK;
-    if (ireq->sack_ok)
-        options |= TS_OPT_SACK;
-    if (ireq->ecn_ok)
-        options |= TS_OPT_ECN;
-
-    ts = ts_now & ~TSMASK;
-    ts |= options;
-
-    if (ts > ts_now) {
-        ts >>= TSBITS;
-        ts--;
-        ts <<= TSBITS;
-        ts |= options;
+    FILE *file;
+    file = fopen("/proc/beget_uptime", "r");
+    __u32 tcp_cookie_time = 0;
+    __u64 jiffies = 0;
+    if (fscanf (file, "%llu %lu", &jiffies, (long *)&tcp_cookie_time)) {
+        fclose(file);
+        logger.warn("jiffies %lu, tcp_cookie_time %lu, jiffies %u", jiffies, tcp_cookie_time);
+        __u32 tmp = (__u32) jiffies & 0X00000000ffffffff;
+        logger.warn("jiffies %u", tmp);
+        return tmp;
+    } else {
+        logger.warn("Noooo");
+        fclose(file);
+        return 0;
     }
-
-    return ts;
 }
 
 static __u32 secure_tcp_syn_cookie(__be32 saddr, __be32 daddr, __be16 sport,
@@ -169,12 +168,7 @@ static __u16 const msstab[] = {
 
 static __u8 const msstab_array_size = 4;
 
-/*
- * Generate a syncookie.  mssp points to the mss, which is returned
- * rounded down to the value encoded in the cookie.
- */
-__u32 __cookie_v4_init_sequence(__be32	saddr, __be32 daddr, __be16	source, __be16	dest, __be32 seq,
-                                __u16 *mssp)
+__u16 get_mss(__u16 *mssp)
 {
     __u32 mssind;
     const __u16 mss = *mssp;
@@ -184,7 +178,27 @@ __u32 __cookie_v4_init_sequence(__be32	saddr, __be32 daddr, __be16	source, __be1
             break;
         }
 
-    *mssp = msstab[mssind];
-    return secure_tcp_syn_cookie(saddr, daddr, source, dest, seq, mssind);
+    return msstab[mssind];
+}
+
+/*
+ * Generate a syncookie.  mssp points to the mss, which is returned
+ * rounded down to the value encoded in the cookie.
+ */
+__u32 __cookie_v4_init_sequence(__be32	saddr, __be32 daddr, __be16	source, __be16	dest, __be32 seq, __u16 mssp)
+{
+//    logger.debug("seq=%i iph->saddr = %i, iph->daddr = %i, th->source=%i, th->dest=%i",
+//                 seq, ntohl(saddr), ntohl(daddr), ntohs(source), ntohs(dest));
+    
+    __u32 mssind;
+    const __u16 mss = mssp;
+
+    for (mssind = msstab_array_size - 1; mssind ; mssind--) {
+        if (mss >= msstab[mssind]) {
+            break;
+        }
+    }
+
+    return secure_tcp_syn_cookie(ntohl(saddr), ntohl(daddr), ntohs(source), ntohs(dest), seq, mssind);
 }
 

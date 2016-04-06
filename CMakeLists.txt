@@ -3,7 +3,14 @@ project(synfloodprotect)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
-set(SOURCE_FILES main.cpp)
+set(SOURCE_FILES    main.cpp
+                    lib/protocol_helpers/tcp.h
+                    lib/protocol_helpers/tcp.cpp
+                    lib/protocol_helpers/ip.h
+                    lib/protocol_helpers/ip.cpp
+                    lib/protocol_helpers/icmp.h
+                    lib/protocol_helpers/icmp.cpp)
+
 add_executable(synfloodprotect ${SOURCE_FILES})
 #include_directories("/usr/src/linux-4.3.3/")
 #include_directories("/usr/src/linux-4.3.3/include")
@@ -24,9 +31,14 @@ set(SOURCE_LIB_PARCER lib/parser/parcer.cpp
 add_library(parcer STATIC ${SOURCE_LIB_PARCER})
 target_link_libraries(synfloodprotect parcer)
 
-#set(SOURCE_LIB_SYNC  lib/syncookie/synproxy.cpp lib/syncookie/synproxy.h lib/syncookie/cryptohash.h lib/syncookie/sha1.c lib/syncookie/be_byteshift.h)
-#add_library(syncookie STATIC ${SOURCE_LIB_SYNC})
-#target_link_libraries(synfloodprotect syncookie)
+set(SOURCE_LIB_SYNC lib/syncookie/sha1.c
+                    lib/syncookie/be_byteshift.h
+                    lib/syncookie/cryptohash.h
+                    lib/syncookie/div64.h
+                    lib/syncookie/synproxy.cpp
+                    lib/syncookie/synproxy.h)
+add_library(syncookie STATIC ${SOURCE_LIB_SYNC})
+target_link_libraries(synfloodprotect syncookie)
 
 set(LOG4CPP_CUSTOM_INSTALL_PATH "/opt/log4cpp1.1.1")
 

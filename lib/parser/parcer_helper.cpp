@@ -189,7 +189,7 @@ char* proto2str(u_short proto) {
     }
 }
 
-int fastnetmon_print_parsed_pkt(char* buff, u_int buff_len, const struct pfring_pkthdr* h)
+int print_parsed_pkt(char *buff, u_int buff_len, const struct pfring_pkthdr *h)
 {
     char buf1[32], buf2[32];
     int buff_used = 0;
