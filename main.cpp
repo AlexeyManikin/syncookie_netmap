@@ -23,6 +23,7 @@
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/regex.hpp>
+#include <boost/atomic/atomic.hpp>
 
 // Boost libs
 #include <boost/algorithm/string.hpp>
@@ -40,7 +41,7 @@
 #include "lib/parser/parcer.h"
 #include "lib/syncookie/synproxy.h"
 
-#define WAIT_NIC_TIME 4
+#define WAIT_NIC_TIME 2
 
 #define TCP_SYN_FLAG_SHIFT 2
 #define TCP_ACK_FLAG_SHIFT 5
@@ -49,7 +50,8 @@
 extern log4cpp::Category& logger;
 static int do_not_abort = 1;
 
-
+boost::atomic<__u32> tcp_time_stamp;
+boost::atomic<__u32> tcp_cookie_time;
 
 static void sigint_h(int sig)
 {
@@ -128,23 +130,6 @@ static void generate_tcp_options(char* buf, uint16_t mss, u_int32_t timesend, u_
     s8->val = wscale;
 }
 
-uint32_t synproxy_init_timestamp_cookie(unsigned char wscale, uint8_t sperm, uint8_t ecn)
-{
-    uint32_t tsval = tcp_time_stamp() & ~0x3f;
-
-    if (wscale) {
-        tsval |= wscale;
-    } else
-        tsval |= 0xf;
-
-    if (sperm)
-        tsval |= 1 << 4;
-
-    if (ecn)
-        tsval |= 1 << 5;
-
-    return tsval;
-}
 
 bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring, struct pfring_pkthdr *packet_header,
                              struct pollfd* fd_out)
@@ -154,14 +139,6 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
 
     tx_cur   = tx_ring->cur;
     tx_avail = nm_ring_space(tx_ring);
-
-
-    // DEBUG /////////////////////////////////////////////////////////////
-//    char *print;
-//    print = (char *) std::malloc(999);
-//    print_parsed_pkt(print, 999, packet_header);
-//    logger.debug("%s", print);
-    // DEBUG /////////////////////////////////////////////////////////////
 
     if (tx_avail > 0) {
         unsigned char* pointer;
@@ -184,6 +161,9 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
         tcphdr* tcp;
         tcp = (struct tcphdr*) &pointer[sizeof(struct ethhdr) + 20];
 
+        __u32 tcp_time_stamp = tcp_time_stamp.load(memory_order_acquire);
+        __u32 tcp_cookie_time = tcp_cookie_time.load(memory_order_acquire);
+
         initialize_tcphdr(tcp, packet_header->extended_hdr.parsed_pkt.l4_dst_port,
                           packet_header->extended_hdr.parsed_pkt.l4_src_port,
                           packet_header->extended_hdr.parsed_pkt.tcp.seq_num,
@@ -192,7 +172,8 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
                                                     (__be16) packet_header->extended_hdr.parsed_pkt.l4_src_port,
                                                     (__be16) packet_header->extended_hdr.parsed_pkt.l4_dst_port,
                                                     packet_header->extended_hdr.parsed_pkt.tcp.seq_num,
-                                                    packet_header->extended_hdr.parsed_pkt.tcp.options.mss));
+                                                    packet_header->extended_hdr.parsed_pkt.tcp.options.mss,
+                                                    tcp_cookie_time));
 
         tcp->syn = 1;
         tcp->ack = 1;
@@ -201,7 +182,7 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
                              get_mss(&packet_header->extended_hdr.parsed_pkt.tcp.options.mss),
                              synproxy_init_timestamp_cookie(/*packet_header->extended_hdr.parsed_pkt.tcp.options.wscale*/ 7,
                                                             packet_header->extended_hdr.parsed_pkt.tcp.options.saksp,
-                                                            0),
+                                                            0, tcp_time_stamp),
                              packet_header->extended_hdr.parsed_pkt.tcp.options.timestamp_send,
                              7,
                              packet_header->extended_hdr.parsed_pkt.tcp.options.saksp);
@@ -281,6 +262,26 @@ bool send_echo_response(char *rx_buf, int len, struct netmap_ring *tx_ring, stru
         free(pointer);
     } else {
         //logger.warn("tx not availible");
+    }
+}
+
+static void update_time_value()
+{
+    while (do_not_abort) {
+        FILE *file;
+        file = fopen("/proc/beget_uptime", "r");
+        __u32 tcp_cookie_time = 0;
+        __u64 jiffies = 0;
+        if (fscanf (file, "%llu %lu", &jiffies, (long *)&tcp_cookie_time)) {
+            fclose(file);
+
+            tcp_time_stamp.store((__u32) jiffies & 0X00000000ffffffff, memory_order_release);
+            tcp_cookie_time.store(tcp_cookie_time, memory_order_release);
+        } else {
+            fclose(file);
+            logger.error("time value not updated");
+        }
+        boost::this_thread::sleep(boost::posix_time::milliseconds(300));
     }
 }
 
@@ -419,6 +420,8 @@ void create_main_work_pool(std::string interface_for_listening)
     // Обрабатываем сигналы завершения для закрытия netmap
     signal(SIGINT, sigint_h);
     signal(SIGTERM, sigint_h);
+
+    packet_nic_rx_thread_group.add_thread(new boost::thread(update_time_value));
 
     for (uint16_t i = 0; i < netmap_descriptor->req.nr_rx_rings; i++) {
 
