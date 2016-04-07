@@ -147,26 +147,22 @@ uint32_t synproxy_init_timestamp_cookie(unsigned char wscale, uint8_t sperm, uin
 }
 
 bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring, struct pfring_pkthdr *packet_header,
-                             struct pollfd* fd_out)
+                             int fd)
 {
     register unsigned int tx_avail, tx_cur;
     char *tx_buf;
 
-    int poll_result = poll(&fd_out, 4, 200);
-    if (poll_result == 0)
-        continue;
+    struct pollfd pfd = { .fd = fd, .events = POLLOUT };
 
+    int poll_result = poll(&pfd, 4, 2000);
+    //logger.warn("poll result %i", poll_result);
+    if (poll_result <= 0) {
+        logger.warn("poll error");
+        return false;
+    }
 
     tx_cur   = tx_ring->cur;
     tx_avail = nm_ring_space(tx_ring);
-
-
-    // DEBUG /////////////////////////////////////////////////////////////
-//    char *print;
-//    print = (char *) std::malloc(999);
-//    print_parsed_pkt(print, 999, packet_header);
-//    logger.debug("%s", print);
-    // DEBUG /////////////////////////////////////////////////////////////
 
     if (tx_avail > 0) {
         unsigned char* pointer;
@@ -221,13 +217,13 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
         tx_ring->slot[tx_cur].flags |= NS_BUF_CHANGED;
         tx_ring->head = tx_ring->cur = nm_ring_next(tx_ring, tx_cur);
 
-        ioctl(fd_out->fd, NIOCTXSYNC, NULL);
+        ioctl(fd, NIOCTXSYNC, NULL);
         std::free(pointer);
 
         return true;
     } else {
-        ioctl(fd_out->fd, NIOCTXSYNC, NULL);
-        //logger.warn("tx not availible");
+        ioctl(fd, NIOCTXSYNC, NULL);
+        logger.warn("tx not available");
     }
     return false;
 }
@@ -350,7 +346,7 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
                             //logger.warn("syn");
                             //if (packet_header.extended_hdr.parsed_pkt.tcp.options.mss != 0) {
                                 //logger.warn("mss != 0 ");
-                                send_syncookie_response(rx_buf, rx_len, tx_ring, &packet_header, &fd_out);
+                                send_syncookie_response(rx_buf, rx_len, tx_ring, &packet_header, netmap_description->fd);
                             //} else {
                                 // DROP PACKET
                             //}
