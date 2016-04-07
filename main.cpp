@@ -23,6 +23,7 @@
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/regex.hpp>
+#include <boost/atomic/atomic.hpp>
 
 // Boost libs
 #include <boost/algorithm/string.hpp>
@@ -40,7 +41,7 @@
 #include "lib/parser/parcer.h"
 #include "lib/syncookie/synproxy.h"
 
-#define WAIT_NIC_TIME 4
+#define WAIT_NIC_TIME 2
 
 #define TCP_SYN_FLAG_SHIFT 2
 #define TCP_ACK_FLAG_SHIFT 5
@@ -49,7 +50,12 @@
 extern log4cpp::Category& logger;
 static int do_not_abort = 1;
 
+boost::atomic<__u32> tcp_time_stamp;
+boost::atomic<__u32> tcp_cookie_time;
 
+bool execute_strict_cpu_affinity = true;
+
+u_int num_cpus = 0;
 
 static void sigint_h(int sig)
 {
@@ -128,23 +134,6 @@ static void generate_tcp_options(char* buf, uint16_t mss, u_int32_t timesend, u_
     s8->val = wscale;
 }
 
-uint32_t synproxy_init_timestamp_cookie(unsigned char wscale, uint8_t sperm, uint8_t ecn)
-{
-    uint32_t tsval = tcp_time_stamp() & ~0x3f;
-
-    if (wscale) {
-        tsval |= wscale;
-    } else
-        tsval |= 0xf;
-
-    if (sperm)
-        tsval |= 1 << 4;
-
-    if (ecn)
-        tsval |= 1 << 5;
-
-    return tsval;
-}
 
 bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring, struct pfring_pkthdr *packet_header,
                              int fd)
@@ -154,8 +143,7 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
 
     struct pollfd pfd = { .fd = fd, .events = POLLOUT };
 
-    int poll_result = poll(&pfd, 4, 2000);
-    //logger.warn("poll result %i", poll_result);
+    int poll_result = poll(&pfd, 4, 4000);
     if (poll_result <= 0) {
         logger.warn("poll error");
         return false;
@@ -165,10 +153,10 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
     tx_avail = nm_ring_space(tx_ring);
 
     if (tx_avail > 0) {
-        unsigned char* pointer;
         unsigned int size = sizeof(ether_header) + 20 + sizeof(tcphdr) + 24; /* tcp options */
+        unsigned char pointer_array[sizeof(ether_header) + 20 + sizeof(tcphdr) + 24];
+        unsigned char* pointer = (unsigned char*) &pointer_array;
 
-        pointer = (unsigned char *) std::malloc(size);
         std::memset(pointer, 0, size);
 
         initialize_ehhdr(packet_header->extended_hdr.parsed_pkt.dmac,
@@ -185,6 +173,9 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
         tcphdr* tcp;
         tcp = (struct tcphdr*) &pointer[sizeof(struct ethhdr) + 20];
 
+        __u32 tcp_time_stamp_value =  tcp_time_stamp.load();
+        __u32 tcp_cookie_time_value = tcp_cookie_time.load();
+
         initialize_tcphdr(tcp, packet_header->extended_hdr.parsed_pkt.l4_dst_port,
                           packet_header->extended_hdr.parsed_pkt.l4_src_port,
                           packet_header->extended_hdr.parsed_pkt.tcp.seq_num,
@@ -193,7 +184,8 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
                                                     (__be16) packet_header->extended_hdr.parsed_pkt.l4_src_port,
                                                     (__be16) packet_header->extended_hdr.parsed_pkt.l4_dst_port,
                                                     packet_header->extended_hdr.parsed_pkt.tcp.seq_num,
-                                                    packet_header->extended_hdr.parsed_pkt.tcp.options.mss));
+                                                    packet_header->extended_hdr.parsed_pkt.tcp.options.mss,
+                                                    tcp_cookie_time_value));
 
         tcp->syn = 1;
         tcp->ack = 1;
@@ -202,11 +194,12 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
                              get_mss(&packet_header->extended_hdr.parsed_pkt.tcp.options.mss),
                              synproxy_init_timestamp_cookie(/*packet_header->extended_hdr.parsed_pkt.tcp.options.wscale*/ 7,
                                                             packet_header->extended_hdr.parsed_pkt.tcp.options.saksp,
-                                                            0),
+                                                            0, tcp_time_stamp_value),
                              packet_header->extended_hdr.parsed_pkt.tcp.options.timestamp_send,
                              7,
                              packet_header->extended_hdr.parsed_pkt.tcp.options.saksp);
 
+        // if tso on not need
         tcp->check = get_tcp_checksum(ip, tcp);
 
         tx_buf = NETMAP_BUF(tx_ring, tx_ring->slot[tx_cur].buf_idx);
@@ -215,11 +208,10 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
 
         tx_ring->slot[tx_cur].len = (uint16_t) size;
         tx_ring->slot[tx_cur].flags |= NS_BUF_CHANGED;
+        tx_ring->slot[tx_cur].flags |= NS_REPORT;
         tx_ring->head = tx_ring->cur = nm_ring_next(tx_ring, tx_cur);
 
         ioctl(fd, NIOCTXSYNC, NULL);
-        std::free(pointer);
-
         return true;
     } else {
         ioctl(fd, NIOCTXSYNC, NULL);
@@ -285,6 +277,26 @@ bool send_echo_response(char *rx_buf, int len, struct netmap_ring *tx_ring, stru
     }
 }
 
+static void update_time_value()
+{
+    while (do_not_abort) {
+        FILE *file;
+        file = fopen("/proc/beget_uptime", "r");
+        __u32 tcp_cookie_time_value = 0;
+        __u64 jiffies_value = 0;
+        if (fscanf (file, "%llu %lu", &jiffies_value, (long *)&tcp_cookie_time_value)) {
+            fclose(file);
+
+            tcp_time_stamp.store((__u32) jiffies_value & 0X00000000ffffffff);
+            tcp_cookie_time.store(tcp_cookie_time_value);
+        } else {
+            fclose(file);
+            logger.error("time value not updated");
+        }
+        boost::this_thread::sleep(boost::posix_time::milliseconds(300));
+    }
+}
+
 static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int thread_id)
 {
     struct pollfd fd_in, fd_out;
@@ -343,33 +355,20 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
                         flags = packet_header.extended_hdr.parsed_pkt.tcp.flags;
 
                         if (flags == 2 /*TCP_SYN_FLAG*/) {
-                            //logger.warn("syn");
-                            //if (packet_header.extended_hdr.parsed_pkt.tcp.options.mss != 0) {
-                                //logger.warn("mss != 0 ");
+                            if (packet_header.extended_hdr.parsed_pkt.tcp.options.mss != 0) {
                                 send_syncookie_response(rx_buf, rx_len, tx_ring, &packet_header, netmap_description->fd);
-                            //} else {
+                            } else {
                                 // DROP PACKET
-                            //}
+                            }
 //                        } else if (flags == 16 /*TCP_ACK_FLAG*/) {
-//                            if (check_syncookie(packet_header.extended_hdr.parsed_pkt.tcp.ack_num,
-//                                                packet_header.extended_hdr.parsed_pkt.l4_src_port,
-//                                                packet_header.extended_hdr.parsed_pkt.tcp.options.timestamp_reserved))
-//                            if (packet_header.extended_hdr.parsed_pkt.l4_dst_port == 22) {
-//                                if (packet_header.extended_hdr.parsed_pkt.tcp.ack_num == 1207
-//                                    && packet_header.extended_hdr.parsed_pkt.tcp.options.timestamp_reserved == 1206) {
-//                                    send_syn_to_host_response(rx_ring, &packet_header);
-//                                } else {
-//                                    forward_packet(rx_ring, rx_cur);
-//                                }
-//                            } else {
-//                                forward_packet(rx_ring, rx_cur);
-//                            }
+//                            TODO: validate syn/ack
+//                        }
                         } else {
                             forward_packet(rx_ring, rx_cur);
                         }
                     } else if (packet_header.extended_hdr.parsed_pkt.l3_proto == IPPROTO_UDP) {
                         // UPD NEED DROP
-                        forward_packet(rx_ring, rx_cur);
+                        // forward_packet(rx_ring, rx_cur);
                     } else {
                         // other arp
                         forward_packet(rx_ring, rx_cur);
@@ -421,6 +420,9 @@ void create_main_work_pool(std::string interface_for_listening)
     signal(SIGINT, sigint_h);
     signal(SIGTERM, sigint_h);
 
+    packet_nic_rx_thread_group.add_thread(new boost::thread(update_time_value));
+    boost::thread::yield();
+
     for (uint16_t i = 0; i < netmap_descriptor->req.nr_rx_rings; i++) {
 
         struct nm_desc params_descriptor = *netmap_descriptor;
@@ -450,7 +452,41 @@ void create_main_work_pool(std::string interface_for_listening)
         logger.info("My first tx ring is %d and last ring id is %d I'm thread %d",
                     one_nic_ring_netmap_descriptor->first_tx_ring, one_nic_ring_netmap_descriptor->last_tx_ring, i);
 
+#if defined(BOOST_THREAD_PLATFORM_PTHREAD) && BOOST_VERSION / 100 % 1000 >= 50
+
+        /* Bind to certain core */
+        boost::thread::attributes thread_attrs;
+
+        if (execute_strict_cpu_affinity) {
+            cpu_set_t current_cpu_set;
+
+            int cpu_to_bind = i % num_cpus;
+            CPU_ZERO(&current_cpu_set);
+
+            // We count cpus from zero
+            CPU_SET(cpu_to_bind, &current_cpu_set);
+
+            logger.info("I will bind this thread to logical CPU: %d", cpu_to_bind);
+
+            int set_affinity_result = pthread_attr_setaffinity_np(thread_attrs.native_handle(),
+                                                                  sizeof(cpu_set_t),
+                                                                  &current_cpu_set);
+
+            if (set_affinity_result != 0) {
+                logger.error("Can't specify CPU affinity for netmap thread");
+            }
+        }
+
+        // Start thread and pass netmap descriptor to it
+        packet_nic_rx_thread_group.add_thread(
+                new boost::thread(thread_attrs,
+                                  boost::bind(rx_nic_thread, one_nic_ring_netmap_descriptor, i)
+                )
+        );
+#else
+        logger.error("Sorry but CPU affinity did not supported for your platform");
         packet_nic_rx_thread_group.add_thread(new boost::thread(rx_nic_thread, one_nic_ring_netmap_descriptor, i));
+#endif
     }
 
     packet_nic_rx_thread_group.join_all();
@@ -465,6 +501,8 @@ int main(int argc, char *argv[])
     init_logging();
     logger << log4cpp::Priority::DEBUG << "Run program";
 
+
+
     const char* interface;
 
     if (argc < 2) {
@@ -475,6 +513,9 @@ int main(int argc, char *argv[])
     interface = argv[1];
     std::string std_interface(interface);
     logger << log4cpp::Priority::INFO << "netmap will sniff interface: " << std_interface;
+
+    num_cpus = (u_int) sysconf(_SC_NPROCESSORS_ONLN);
+    logger.info("We have %d cpus", num_cpus);
 
     create_main_work_pool(std_interface);
 

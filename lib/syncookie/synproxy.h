@@ -30,10 +30,12 @@
 #include <iostream>
 #include <boost/asio.hpp>
 
-__u32 __cookie_v4_init_sequence(__be32	saddr, __be32 daddr, __be16	source, __be16	dest, __be32 seq, __u16 mssp);
-__u32  tcp_time_stamp();
+__u32 __cookie_v4_init_sequence(__be32	saddr, __be32 daddr, __be16	source, __be16	dest, __be32 seq, __u16 mssp,
+                                __u32 tcp_cookie_time));
+
 __u16 get_mss(__u16 *mssp);
-__u32 tcp_cookie_time(void);
-__u32 tcp_time_stamp(void);
+
+uint32_t synproxy_init_timestamp_cookie(unsigned char wscale, uint8_t sperm, uint8_t ecn, __u32 tcp_time_stamp);
+
 
 #endif //SYNFLOODPROTECT_SYNPROXY_H_H
