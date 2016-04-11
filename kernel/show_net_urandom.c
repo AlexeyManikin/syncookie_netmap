@@ -29,6 +29,35 @@
  */
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <net/tcp.h>
+
+static int uptime_proc_show_beget(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%lu %lu\n", (unsigned long) jiffies, (unsigned long)tcp_cookie_time());
+	return 0;
+}
+
+static int uptime_proc_open_beget(struct inode *inode, struct file *file)
+{
+	return single_open(file, uptime_proc_show_beget, NULL);
+}
+
+static const struct file_operations uptime_proc_fops_beget = {
+	.open		= uptime_proc_open_beget,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+/*
+static int __init proc_uptime_init_beget(void)
+{
+	proc_create("beget_uptime", 0, NULL, &uptime_proc_fops_beget);
+	return 0;
+}
+*/
 
 /*
  * This is the init function, which is run when the module is first
@@ -38,8 +67,7 @@
 
 static int __init hello_init(void)
 {
-	printk("Hello, world!\n");
-	return 0;
+	return proc_create("beget_uptime", 0, NULL, &uptime_proc_fops_beget) == NULL;
 }
 
 /*
@@ -57,7 +85,7 @@ module_init(hello_init);
 
 static void __exit hello_exit(void)
 {
-	printk("Goodbye, world!\n");
+	remove_proc_entry("beget_uptime", 0);
 }
 
 module_exit(hello_exit);
