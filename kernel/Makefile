@@ -7,7 +7,7 @@ obj-m := show_net_urandom.o
 # KDIR is the location of the kernel source.  The current standard is
 # to link to the associated source tree from the directory containing
 # the compiled modules.
-KDIR  :=  /lib/modules/4.3.3-manikin/build
+KDIR  :=  /lib/modules/`uname -r`/build
 
 # PWD is the current working directory and the location of our module
 # source files.
