@@ -42,7 +42,6 @@ find_library(LOG4CPP_LIBRARY_PATH NAMES log4cpp PATHS "${LOG4CPP_CUSTOM_INSTALL_
 
 if (LOG4CPP_INCLUDES_FOLDER AND LOG4CPP_LIBRARY_PATH)
     include_directories(${LOG4CPP_INCLUDES_FOLDER})
-    target_link_libraries(logger ${LOG4CPP_LIBRARY_PATH})
     target_link_libraries(synfloodprotect ${LOG4CPP_LIBRARY_PATH})
     message(STATUS "We have found log4cpp and will build project")
 else()

@@ -153,10 +153,10 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
     tx_avail = nm_ring_space(tx_ring);
 
     if (tx_avail > 0) {
+        unsigned char* pointer;
         unsigned int size = sizeof(ether_header) + 20 + sizeof(tcphdr) + 24; /* tcp options */
-        unsigned char pointer_array[sizeof(ether_header) + 20 + sizeof(tcphdr) + 24];
-        unsigned char* pointer = (unsigned char*) &pointer_array;
 
+        pointer = (unsigned char *) std::malloc(size);
         std::memset(pointer, 0, size);
 
         initialize_ehhdr(packet_header->extended_hdr.parsed_pkt.dmac,
@@ -212,6 +212,8 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
         tx_ring->head = tx_ring->cur = nm_ring_next(tx_ring, tx_cur);
 
         ioctl(fd, NIOCTXSYNC, NULL);
+        std::free(pointer);
+
         return true;
     } else {
         ioctl(fd, NIOCTXSYNC, NULL);
@@ -355,20 +357,33 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
                         flags = packet_header.extended_hdr.parsed_pkt.tcp.flags;
 
                         if (flags == 2 /*TCP_SYN_FLAG*/) {
-                            if (packet_header.extended_hdr.parsed_pkt.tcp.options.mss != 0) {
+                            //logger.warn("syn");
+                            //if (packet_header.extended_hdr.parsed_pkt.tcp.options.mss != 0) {
+                                //logger.warn("mss != 0 ");
                                 send_syncookie_response(rx_buf, rx_len, tx_ring, &packet_header, netmap_description->fd);
-                            } else {
+                            //} else {
                                 // DROP PACKET
-                            }
+                            //}
 //                        } else if (flags == 16 /*TCP_ACK_FLAG*/) {
-//                            TODO: validate syn/ack
-//                        }
+//                            if (check_syncookie(packet_header.extended_hdr.parsed_pkt.tcp.ack_num,
+//                                                packet_header.extended_hdr.parsed_pkt.l4_src_port,
+//                                                packet_header.extended_hdr.parsed_pkt.tcp.options.timestamp_reserved))
+//                            if (packet_header.extended_hdr.parsed_pkt.l4_dst_port == 22) {
+//                                if (packet_header.extended_hdr.parsed_pkt.tcp.ack_num == 1207
+//                                    && packet_header.extended_hdr.parsed_pkt.tcp.options.timestamp_reserved == 1206) {
+//                                    send_syn_to_host_response(rx_ring, &packet_header);
+//                                } else {
+//                                    forward_packet(rx_ring, rx_cur);
+//                                }
+//                            } else {
+//                                forward_packet(rx_ring, rx_cur);
+//                            }
                         } else {
                             forward_packet(rx_ring, rx_cur);
                         }
                     } else if (packet_header.extended_hdr.parsed_pkt.l3_proto == IPPROTO_UDP) {
                         // UPD NEED DROP
-                        // forward_packet(rx_ring, rx_cur);
+                        forward_packet(rx_ring, rx_cur);
                     } else {
                         // other arp
                         forward_packet(rx_ring, rx_cur);
@@ -461,6 +476,7 @@ void create_main_work_pool(std::string interface_for_listening)
             cpu_set_t current_cpu_set;
 
             int cpu_to_bind = i % num_cpus;
+
             CPU_ZERO(&current_cpu_set);
 
             // We count cpus from zero
