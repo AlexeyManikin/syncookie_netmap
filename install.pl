@@ -80,9 +80,7 @@ sub main {
     install_gcc();
     install_boost_builder();
     install_boost();
-    install_json_c();
     install_log4cpp();
-
 
     my $install_time = time() - $start_time;
     my $pretty_install_time_in_minutes = sprintf("%.2f", $install_time / 60);
@@ -305,7 +303,7 @@ sub install_boost_builder {
 
     print "Build Boost builder\n";
     # We haven't system compiler here and we will use custom gcc for compilation here
-    my $bootstrap_result = exec_command("CC=/opt/gcc520/bin/gcc CXX=/opt/gcc520/bin/g++ ./bootstrap.sh --with-toolset=cc");
+    my $bootstrap_result = exec_command("CC=/opt/gcc520/bin/gcc CXX=/opt/gcc520/bin/g++ ./bootstrap.sh --with-libraries=all --with-toolset=cc");
 
     unless ($bootstrap_result) {
         die "bootstrap of Boost Builder failed, please check logs\n";
