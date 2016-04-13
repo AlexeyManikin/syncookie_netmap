@@ -44,7 +44,7 @@ static int symbol_walk_callback(void *data, const char *name,
 	return 0;
 }
 
-static int __init hello_init(void)
+static int __init beget_uptime_init(void)
 {
 	int rc = kallsyms_on_each_symbol(symbol_walk_callback, NULL);
 	if (rc)
@@ -52,14 +52,14 @@ static int __init hello_init(void)
 	return proc_create("beget_uptime", 0, NULL, &uptime_proc_fops_beget) == NULL;
 }
 
-module_init(hello_init);
+module_init(beget_uptime_init);
 
-static void __exit hello_exit(void)
+static void __exit beget_uptime_exit(void)
 {
 	remove_proc_entry("beget_uptime", 0);
 }
 
-module_exit(hello_exit);
+module_exit(beget_uptime_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Alexander Polyakov <apolyakov@beget.ru>");
