@@ -66,7 +66,7 @@ else()
 endif()
 
 #set (Boost_USE_STATIC_LIBS ON)
-#set (Boost_USE_MULTITHREADED ON)
+set (Boost_USE_MULTITHREADED ON)
 
 find_package(Boost COMPONENTS thread regex program_options system atomic REQUIRED)
 message(${Boost_INCLUDE_DIRS})
