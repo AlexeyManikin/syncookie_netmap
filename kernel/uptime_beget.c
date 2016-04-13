@@ -6,7 +6,7 @@
 #include <linux/cryptohash.h>
 #include <net/tcp.h>
 
-static u32 (*syncookie_secret_ptr)[2][16-4+SHA_DIGEST_WORDS] __read_mostly;
+static u32 (*syncookie_secret_ptr)[2][16-4+SHA_DIGEST_WORDS];
 
 static int uptime_proc_show_beget(struct seq_file *m, void *v)
 {
@@ -33,13 +33,6 @@ static const struct file_operations uptime_proc_fops_beget = {
 	.release	= single_release,
 };
 
-/*
- * This is the init function, which is run when the module is first
- * loaded.  The __init keyword tells the kernel that this code will
- * only be run once, when the module is loaded.
- */
-
-
 static int symbol_walk_callback(void *data, const char *name,
 				struct module *mod, unsigned long addr) {
 	if (mod)
@@ -59,18 +52,7 @@ static int __init hello_init(void)
 	return proc_create("beget_uptime", 0, NULL, &uptime_proc_fops_beget) == NULL;
 }
 
-/*
- * The below macro informs the kernel as to which function to use as
- * the init function.
- */
-
 module_init(hello_init);
-
-/*
- * Similary, the exit function is run once, upon module unloading, and
- * the module_exit() macro identifies which function is the exit
- * function.
- */
 
 static void __exit hello_exit(void)
 {
@@ -79,8 +61,7 @@ static void __exit hello_exit(void)
 
 module_exit(hello_exit);
 
-
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Alexander Polyakov <apolyakov@beget.ru>");
-MODULE_DESCRIPTION("\"Show kernel variable to syncookie_netmap");
+MODULE_DESCRIPTION("Show kernel variable to syncookie_netmap");
 MODULE_VERSION("1.0");
