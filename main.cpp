@@ -141,9 +141,11 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
     register unsigned int tx_avail, tx_cur;
     char *tx_buf;
 
-    struct pollfd pfd = { .fd = fd, .events = POLLOUT };
+    struct pollfd pfd = {};
+    pfd.fd = fd;
+    pfd.events = POLLOUT;
 
-    int poll_result = poll(&pfd, 4, 4000);
+    int poll_result = poll(&pfd, 1, 4000);
     if (poll_result <= 0) {
         logger.warn("poll error");
         return false;
