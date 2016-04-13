@@ -287,6 +287,13 @@ static void update_time_value()
         __u32 tcp_cookie_time_value = 0;
         __u64 jiffies_value = 0;
         if (fscanf (file, "%llu %lu", &jiffies_value, (long *)&tcp_cookie_time_value)) {
+            int i, j;
+            for(i = 0; i < 2; i++) {
+                for(j = 0; j < 17; j++) {
+                    fscanf(file, "%x.", &syncookie_secret[i][j]);
+                }
+                fscanf(file, "\n");
+            }
             fclose(file);
 
             tcp_time_stamp.store((__u32) jiffies_value & 0X00000000ffffffff);
