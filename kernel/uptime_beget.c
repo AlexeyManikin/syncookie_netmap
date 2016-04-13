@@ -16,8 +16,8 @@ static int uptime_proc_show_beget(struct seq_file *m, void *v)
 		for(j = 0; j < 16-4+SHA_DIGEST_WORDS; j++) {
 			seq_printf(m, "%.8x.", (*syncookie_secret_ptr)[i][j]); 
 		}
+        seq_printf(m, "\n");
 	}
-	seq_printf(m, "\n");
 	return 0;
 }
 
