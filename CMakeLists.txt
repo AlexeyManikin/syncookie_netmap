@@ -30,6 +30,23 @@ set(SOURCE_LIB_SYNC lib/syncookie/sha1.c
         lib/syncookie/synproxy.cpp
         lib/syncookie/synproxy.h)
 
+
+set(CMAKE_C_COMPILER "/opt/gcc520/bin/gcc")
+set(CMAKE_CXX_COMPILER "/opt/gcc520/bin/g++")
+
+set(BOOST_INCLUDEDIR "/opt/boost_1_58_0")
+set(BOOST_LIBRARYDIR "/opt/boost_1_58_0/stage/lib/")
+
+# It's really nice part of this custom build process :)
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -std=c++11")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=c++11")
+
+# Disable warning from Boost when compiling with gcc 5.2
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wno-deprecated-declarations")
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH};/opt/gcc520/lib64;/opt/boost_1_58_0/stage/lib;/opt/log4cpp1.1.1/lib")
+
+set(CMAKE_BUILD_TYPE Release)
+
 add_executable(synfloodprotect ${HEADER_FILES} ${SOURCE_LIB_SYNC} ${SOURCE_FILES})
 
 include_directories(".")
@@ -48,8 +65,8 @@ else()
     message(FATAL_ERROR "We can't find log4cpp. We can't build project")
 endif()
 
-set (Boost_USE_STATIC_LIBS ON)
-set (Boost_USE_MULTITHREADED ON)
+#set (Boost_USE_STATIC_LIBS ON)
+#set (Boost_USE_MULTITHREADED ON)
 
 find_package(Boost COMPONENTS thread regex program_options system atomic REQUIRED)
 message(${Boost_INCLUDE_DIRS})
