@@ -4,6 +4,7 @@
 #include <poll.h>
 #include <time.h>
 #include <arpa/inet.h>
+#include <assert.h>
 
 #include <sys/types.h>
 
@@ -141,9 +142,11 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
     register unsigned int tx_avail, tx_cur;
     char *tx_buf;
 
-    struct pollfd pfd = { .fd = fd, .events = POLLOUT };
+    struct pollfd pfd = {};
+    pfd.fd = fd;
+    pfd.events = POLLOUT;
 
-    int poll_result = poll(&pfd, 4, 4000);
+    int poll_result = poll(&pfd, 1, 4000);
     if (poll_result <= 0) {
         logger.warn("poll error");
         return false;
@@ -153,12 +156,19 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
     tx_avail = nm_ring_space(tx_ring);
 
     if (tx_avail > 0) {
-        unsigned char* pointer;
-        unsigned int size = sizeof(ether_header) + 20 + sizeof(tcphdr) + 24; /* tcp options */
+        const unsigned int size = sizeof(ether_header) + 20 + sizeof(tcphdr) + 24; /* tcp options */
+#ifdef DEBUG
+#define CANARY_SIZE 8
+	char canary[CANARY_SIZE] = { 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef };
+#else
+#define CANARY_SIZE 0
+#endif
+        unsigned char pointer[size+CANARY_SIZE];
 
-        pointer = (unsigned char *) std::malloc(size);
         std::memset(pointer, 0, size);
-
+#ifdef DEBUG
+	std::memcpy(pointer+size, canary, CANARY_SIZE);
+#endif
         initialize_ehhdr(packet_header->extended_hdr.parsed_pkt.dmac,
                          packet_header->extended_hdr.parsed_pkt.smac,
                          (struct ether_header *) pointer);
@@ -198,7 +208,9 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
                              packet_header->extended_hdr.parsed_pkt.tcp.options.timestamp_send,
                              7,
                              packet_header->extended_hdr.parsed_pkt.tcp.options.saksp);
-
+#ifdef DEBUG
+	assert(memcmp(pointer + size, canary, CANARY_SIZE) == 0);
+#endif
         // if tso on not need
         tcp->check = get_tcp_checksum(ip, tcp);
 
@@ -212,7 +224,6 @@ bool send_syncookie_response(char *rx_buf, int len, struct netmap_ring *tx_ring,
         tx_ring->head = tx_ring->cur = nm_ring_next(tx_ring, tx_cur);
 
         ioctl(fd, NIOCTXSYNC, NULL);
-        std::free(pointer);
 
         return true;
     } else {

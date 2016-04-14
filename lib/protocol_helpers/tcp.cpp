@@ -105,8 +105,8 @@ u_int16_t get_tcp_checksum(struct iphdr* myip, struct tcphdr* mytcp)
     pseudohead.length=htons(sizeof(struct tcphdr) + tcpopt_len + tcpdatalen);
 
     int totaltcp_len = sizeof(struct tcp_pseudo) + sizeof(struct tcphdr) + tcpopt_len + tcpdatalen;
-    unsigned short * tcp = new unsigned short[totaltcp_len];
-
+    unsigned short tcp[totaltcp_len];
+    memset(tcp, 0, totaltcp_len);
 
     std::memcpy((unsigned char *) tcp, &pseudohead,
                 sizeof(struct tcp_pseudo));
