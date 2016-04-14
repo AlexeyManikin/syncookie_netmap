@@ -50,8 +50,6 @@ inline static __u32 cookie_hash(__be32 saddr, __be32 daddr, __be16 sport, __be16
 
     //net_get_random_once(syncookie_secret, sizeof(syncookie_secret));
 
-    std::memset(syncookie_secret, 0, sizeof(syncookie_secret));
-
     tmp  = (__u32 *) std::malloc(sizeof(__u32) * (16 + 5 + SHA_WORKSPACE_WORDS));
 
     std::memcpy(tmp + 4, syncookie_secret[c], sizeof(syncookie_secret[c]));
