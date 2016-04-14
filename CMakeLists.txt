@@ -65,7 +65,6 @@ else()
     message(FATAL_ERROR "We can't find log4cpp. We can't build project")
 endif()
 
-#set (Boost_USE_STATIC_LIBS ON)
 set (Boost_USE_MULTITHREADED ON)
 
 find_package(Boost COMPONENTS thread regex program_options system atomic REQUIRED)

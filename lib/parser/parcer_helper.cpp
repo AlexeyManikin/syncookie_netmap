@@ -198,10 +198,6 @@ int print_parsed_pkt(char *buff, u_int buff_len, const struct pfring_pkthdr *h)
                           etheraddr2string((const u_char*) h->extended_hdr.parsed_pkt.smac, buf1),
                           etheraddr2string((const u_char*) h->extended_hdr.parsed_pkt.dmac, buf2));
 
-    if (h->extended_hdr.parsed_pkt.offset.vlan_offset)
-        buff_used +=
-                snprintf(&buff[buff_used], buff_len - buff_used, "[vlan %u] ", h->extended_hdr.parsed_pkt.vlan_id);
-
     if (h->extended_hdr.parsed_pkt.eth_type == 0x0800 /* IPv4*/ ||
         h->extended_hdr.parsed_pkt.eth_type == 0x86DD /* IPv6*/) {
 

@@ -322,9 +322,9 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
     struct pollfd fd_in, fd_out;
     struct netmap_ring *rx_ring = NULL;
     struct netmap_ring *tx_ring = NULL;
-    register unsigned int rx_cur, tx_cur, rx_len;
-    unsigned int tx_avail;
-    char *rx_buf, *tx_buf;
+    register unsigned int rx_cur, rx_len;
+    char *rx_buf;
+    int poll_result, i;
 
     struct netmap_if* nifp = netmap_description->nifp;
 
@@ -335,8 +335,7 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
     fd_out.events = POLLOUT;
 
     while (do_not_abort) {
-
-        int poll_result = poll(&fd_in, 1, 1000);
+        poll_result = poll(&fd_in, 1, 1000);
         if (poll_result == 0)
             continue;
 
@@ -345,7 +344,7 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
             exit(3);
         }
 
-        for (int i = netmap_description->first_rx_ring; i <= netmap_description->last_rx_ring; i++) {
+        for (i = netmap_description->first_rx_ring; i <= netmap_description->last_rx_ring; i++) {
             rx_ring = NETMAP_RXRING(nifp, i);
 
             while (!nm_ring_empty(rx_ring)) {
@@ -364,8 +363,8 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
                     tx_ring->num_slots;
 
                     if (packet_header.extended_hdr.parsed_pkt.l3_proto == IPPROTO_ICMP
-                        || packet_header.extended_hdr.parsed_pkt.l4_dst_port == 7) {
-
+                        || packet_header.extended_hdr.parsed_pkt.l4_dst_port == 7)
+                    {
                         if (packet_header.extended_hdr.parsed_pkt.icmp.type == 8) {
                             send_echo_response(rx_buf, rx_len, tx_ring, &packet_header);
                         } else if (packet_header.extended_hdr.parsed_pkt.icmp.type == 0) {
@@ -375,39 +374,19 @@ static void rx_nic_thread(struct nm_desc *netmap_description, unsigned int threa
                         flags = packet_header.extended_hdr.parsed_pkt.tcp.flags;
 
                         if (flags == 2 /*TCP_SYN_FLAG*/) {
-                            //logger.warn("syn");
-                            //if (packet_header.extended_hdr.parsed_pkt.tcp.options.mss != 0) {
-                                //logger.warn("mss != 0 ");
-                                send_syncookie_response(rx_buf, rx_len, tx_ring, &packet_header, netmap_description->fd);
-                            //} else {
-                                // DROP PACKET
-                            //}
-//                        } else if (flags == 16 /*TCP_ACK_FLAG*/) {
-//                            if (check_syncookie(packet_header.extended_hdr.parsed_pkt.tcp.ack_num,
-//                                                packet_header.extended_hdr.parsed_pkt.l4_src_port,
-//                                                packet_header.extended_hdr.parsed_pkt.tcp.options.timestamp_reserved))
-//                            if (packet_header.extended_hdr.parsed_pkt.l4_dst_port == 22) {
-//                                if (packet_header.extended_hdr.parsed_pkt.tcp.ack_num == 1207
-//                                    && packet_header.extended_hdr.parsed_pkt.tcp.options.timestamp_reserved == 1206) {
-//                                    send_syn_to_host_response(rx_ring, &packet_header);
-//                                } else {
-//                                    forward_packet(rx_ring, rx_cur);
-//                                }
-//                            } else {
-//                                forward_packet(rx_ring, rx_cur);
-//                            }
+                                send_syncookie_response(rx_buf, rx_len, tx_ring,
+                                                        &packet_header, netmap_description->fd);
                         } else {
                             forward_packet(rx_ring, rx_cur);
                         }
                     } else if (packet_header.extended_hdr.parsed_pkt.l3_proto == IPPROTO_UDP) {
                         // UPD NEED DROP
-                        forward_packet(rx_ring, rx_cur);
+                        // forward_packet(rx_ring, rx_cur);
                     } else {
-                        // other arp
+                        // other
                         forward_packet(rx_ring, rx_cur);
                     }
                 }
-
                 rx_ring->head = rx_ring->cur = nm_ring_next(rx_ring, rx_cur);
             }
         }

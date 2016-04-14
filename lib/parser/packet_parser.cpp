@@ -13,7 +13,6 @@
 #include <arpa/inet.h> // inet_ntop
 
 #include "be_byteshift.h"
-//#include "parcer_helper.h"
 
 // TCP flags
 #define TH_FIN_MULTIPLIER   0x01
@@ -116,7 +115,6 @@ struct iphdr {
 
 #define TCP_SACK_SEEN     (1 << 0)   /*1 = peer is SACK capable, */
 
-
 #define NO_TUNNEL_ID 0xFFFFFFFF
 
 #define NEXTHDR_HOP 0
@@ -131,44 +129,7 @@ struct iphdr {
 #define NEXTHDR_NONE 59
 #define NEXTHDR_DEST 60
 #define NEXTHDR_MOBILITY 135
-void parce_tcp_options(char* tcp_begin, struct tcp_options *options)
-{
-    options->nop = 0;
-    options->wscale = 0;
 
-    struct tcphdr*  tcp = (struct tcphdr*) tcp_begin;
-
-    uint8_t* opt = (uint8_t*)(tcp_begin + sizeof(struct tcphdr));
-    uint8_t* end_options = (uint8_t*)(tcp_begin + tcp->doff * 4);
-
-    while (*opt != TCPOPT_EOL || (void* ) opt <= (void* ) end_options) {
-        tcp_option_t* _opt = (tcp_option_t*)opt;
-        if (_opt->kind == TCPOPT_NOP) {
-            ++opt;
-            options->nop++;
-            continue;
-        }
-
-        if (_opt->kind == TCPOPT_MSS) {
-            options->mss = ntohs((uint16_t)*(opt + sizeof(opt)));
-        }
-
-        if (_opt->kind == TCPOPT_WINDOW) {
-            options->wscale = *(opt + 2);
-        }
-
-        if (_opt->kind == TCPOPT_SACK_PERM) {
-            options->wscale = 1;
-        }
-
-        if (_opt->kind == TCPOPT_TIMESTAMP) {
-            options->timestamp_send = get_unaligned_be32(opt + 2);
-            options->timestamp_reserved = get_unaligned_be32(opt + 6);
-        }
-
-        opt += _opt->size;
-    }
-}
 
 int parse_pkt(unsigned char *pkt, struct pfring_pkthdr *hdr, u_int8_t level /* L2..L4, 5 (tunnel) */)
 {
@@ -176,15 +137,11 @@ int parse_pkt(unsigned char *pkt, struct pfring_pkthdr *hdr, u_int8_t level /* L
     u_int32_t displ = 0, ip_len;
     u_int16_t analyzed = 0, fragment_offset = 0;
 
-    memcpy(&hdr->extended_hdr.parsed_pkt.dmac, eh->h_dest, sizeof(eh->h_dest));
+    memcpy(&hdr->extended_hdr.parsed_pkt.dmac, eh->h_dest,   sizeof(eh->h_dest));
     memcpy(&hdr->extended_hdr.parsed_pkt.smac, eh->h_source, sizeof(eh->h_source));
 
     hdr->extended_hdr.parsed_pkt.eth_type = ntohs(eh->h_proto);
     hdr->extended_hdr.parsed_pkt.offset.eth_offset = 0;
-    hdr->extended_hdr.parsed_pkt.offset.vlan_offset = 0;
-    hdr->extended_hdr.parsed_pkt.vlan_id = 0; /* Any VLAN */
-
-
     hdr->extended_hdr.parsed_pkt.offset.l3_offset = hdr->extended_hdr.parsed_pkt.offset.eth_offset
                                                     + displ + sizeof(struct ethhdr);
     analyzed = 2;
@@ -192,7 +149,6 @@ int parse_pkt(unsigned char *pkt, struct pfring_pkthdr *hdr, u_int8_t level /* L
     if (hdr->extended_hdr.parsed_pkt.eth_type == 0x0800 /* IPv4 */) {
 
         struct iphdr* ip;
-
         hdr->extended_hdr.parsed_pkt.ip_version = 4;
 
         if (hdr->caplen < hdr->extended_hdr.parsed_pkt.offset.l3_offset + sizeof(struct iphdr))
@@ -255,19 +211,21 @@ int parse_pkt(unsigned char *pkt, struct pfring_pkthdr *hdr, u_int8_t level /* L
 
         hdr->extended_hdr.parsed_pkt.l4_src_port = ntohs(tcp->source);
         hdr->extended_hdr.parsed_pkt.l4_dst_port = ntohs(tcp->dest);
-        hdr->extended_hdr.parsed_pkt.offset.payload_offset =
-                                                    hdr->extended_hdr.parsed_pkt.offset.l4_offset + (tcp->doff * 4);
+        hdr->extended_hdr.parsed_pkt.offset.payload_offset = hdr->extended_hdr.parsed_pkt.offset.l4_offset
+                                                             + (tcp->doff * 4);
 
         hdr->extended_hdr.parsed_pkt.tcp.seq_num = ntohl(tcp->seq);
         hdr->extended_hdr.parsed_pkt.tcp.ack_num = ntohl(tcp->ack_seq);
-        hdr->extended_hdr.parsed_pkt.tcp.flags =
-        (tcp->fin * TH_FIN_MULTIPLIER) + (tcp->syn * TH_SYN_MULTIPLIER) + (tcp->rst * TH_RST_MULTIPLIER) +
-        (tcp->psh * TH_PUSH_MULTIPLIER) + (tcp->ack * TH_ACK_MULTIPLIER) + (tcp->urg * TH_URG_MULTIPLIER);
+        hdr->extended_hdr.parsed_pkt.tcp.flags =  (tcp->fin * TH_FIN_MULTIPLIER) + (tcp->syn * TH_SYN_MULTIPLIER)
+                                                  + (tcp->rst * TH_RST_MULTIPLIER) + (tcp->psh * TH_PUSH_MULTIPLIER)
+                                                  + (tcp->ack * TH_ACK_MULTIPLIER) + (tcp->urg * TH_URG_MULTIPLIER);
 
-        if (hdr->extended_hdr.parsed_pkt.tcp.flags == 2 || hdr->extended_hdr.parsed_pkt.tcp.flags == 16 ) {
+        if (hdr->extended_hdr.parsed_pkt.tcp.flags == 2 /*SYN*/
+            || hdr->extended_hdr.parsed_pkt.tcp.flags == 16 /*ASK*/)
+        {
             char* tcp_begin = (char *) &pkt[hdr->extended_hdr.parsed_pkt.offset.l4_offset];
 
-            hdr->extended_hdr.parsed_pkt.tcp.options.nop = 0;
+            hdr->extended_hdr.parsed_pkt.tcp.options.nop    = 0;
             hdr->extended_hdr.parsed_pkt.tcp.options.wscale = 0;
 
             uint8_t* opt = (uint8_t*)(tcp_begin + sizeof(struct tcphdr));
@@ -308,8 +266,8 @@ int parse_pkt(unsigned char *pkt, struct pfring_pkthdr *hdr, u_int8_t level /* L
 
         hdr->extended_hdr.parsed_pkt.l4_src_port = ntohs(udp->source),
         hdr->extended_hdr.parsed_pkt.l4_dst_port = ntohs(udp->dest);
-        hdr->extended_hdr.parsed_pkt.offset.payload_offset =
-        hdr->extended_hdr.parsed_pkt.offset.l4_offset + sizeof(struct udphdr);
+        hdr->extended_hdr.parsed_pkt.offset.payload_offset = hdr->extended_hdr.parsed_pkt.offset.l4_offset
+                                                             + sizeof(struct udphdr);
         analyzed = 4;
 
         if (level < 5) return analyzed;

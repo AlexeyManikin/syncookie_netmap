@@ -31,7 +31,6 @@ struct pkt_offset {
                            ONLY if you are inside the kernel (e.g. when you
                            code a pf_ring plugin). Ignore it in user-space.
                          */
-    int16_t vlan_offset;
     int16_t l3_offset;
     int16_t l4_offset;
     int16_t payload_offset;
@@ -61,7 +60,6 @@ struct pkt_parsing_info {
     /* Core fields (also used by NetFlow) */
     u_int8_t dmac[ETH_ALEN], smac[ETH_ALEN];    /* MAC src/dst addresses */
     u_int16_t eth_type;                         /* Ethernet type */
-    u_int16_t vlan_id;                          /* VLAN Id or NO_VLAN */
     u_int8_t ip_version;
     u_int8_t l3_proto, ip_tos;                  /* Layer 3 protocol/TOS */
     u_int8_t ip_fragmented;                     /* Layer 3 fragmentation flag */
